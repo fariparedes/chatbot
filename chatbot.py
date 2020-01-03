@@ -146,9 +146,6 @@ class Chatbot:
 			await websocket.send(status)
 			join = "JCH {{\"channel\":\"{0}\"}}".format(self.const()["channel"])
 			await websocket.send(join)
-			for channel in self.const()["ad_channels"]:
-				join = "JCH {{\"channel\":\"{0}\"}}".format(channel)
-				await websocket.send(join)
 			while True:
 				receive = await websocket.recv()
 				info = None
