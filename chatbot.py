@@ -69,7 +69,7 @@ class Chatbot:
 			except Exception as e:
 				self.print_error(e)
 		return resp.json()
-	def request_character(name, ticket):
+	def request_character(self, name, ticket):
 		forms = {"account" : self.__account_name, "ticket" : ticket, "name" : name}
 		character_json = self.post_json('https://www.f-list.net/json/api/character-data.php', forms)
 		return character_json
