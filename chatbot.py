@@ -1,5 +1,6 @@
 import json, re
 import websockets, asyncio
+import requests
 import time, datetime
 import math
 import os
@@ -66,15 +67,15 @@ class Chatbot:
 				resp = requests.post(url, data = forms, timeout=10)
 				succeeded = True
 			except Exception as e:
-				print_error(e)
+				self.print_error(e)
 		return resp.json()
 	def request_character(name, ticket):
 		forms = {"account" : self.__account_name, "ticket" : ticket, "name" : name}
-		character_json = post_json('https://www.f-list.net/json/api/character-data.php', forms)
+		character_json = self.post_json('https://www.f-list.net/json/api/character-data.php', forms)
 		return character_json
 	def request_ticket(self, bookmarks = None):
 		forms = {"account" : self.__account_name, "password" : self.__password}
-		ticket_json = post_json('https://www.f-list.net/json/getApiTicket.php', forms)
+		ticket_json = self.post_json('https://www.f-list.net/json/getApiTicket.php', forms)
 		if bookmarks != None:
 			bookmarks |= set([x['name'] for x in ticket_json['bookmarks']] + [x['source_name'] for x in ticket_json['friends']] + ticket_json['characters'])
 		if ticket_json['error'] == '':
@@ -84,7 +85,7 @@ class Chatbot:
 			return 0
 	def ticket(self, bookmarks = None):
 		if self.__ticket == None:
-			self.__ticket = request_ticket(bookmarks)
+			self.__ticket = self.request_ticket(bookmarks)
 		return self.__ticket
 	def clear_ticket(self):
 		self.__ticket = None
@@ -131,6 +132,7 @@ class Chatbot:
 		json_cfg.close()
 		self.update_constants(bot_cfg["constants"])
 		self.update_messages(bot_cfg["messages"])
+		return bot_cfg
 		
 	async def __run_bot(self, ticket):
 		async with websockets.connect('wss://{0}:{1}'.format(self.const()["host"], self.const()["port"])) as websocket:
