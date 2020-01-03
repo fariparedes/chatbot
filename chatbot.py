@@ -73,7 +73,7 @@ class Chatbot:
 		character_json = post_json('https://www.f-list.net/json/api/character-data.php', forms)
 		return character_json
 	def request_ticket(self, bookmarks = None):
-		forms = {"account" : self.__account_name, "password" : self.password}
+		forms = {"account" : self.__account_name, "password" : self.__password}
 		ticket_json = post_json('https://www.f-list.net/json/getApiTicket.php', forms)
 		if bookmarks != None:
 			bookmarks |= set([x['name'] for x in ticket_json['bookmarks']] + [x['source_name'] for x in ticket_json['friends']] + ticket_json['characters'])
