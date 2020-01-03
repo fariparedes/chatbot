@@ -4,10 +4,9 @@ import time, datetime
 import math
 import os
 import traceback
-import abc
 from collections import defaultdict
 
-class Chatbot(abc.ABC):
+class Chatbot:
 	def __init__(self):
 		self.bot_name = "Chatbot"
 		self.service_name = "Python F-List Chatbot"
