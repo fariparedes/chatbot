@@ -24,6 +24,12 @@ class Chatbot:
 		return self.__constants
 	def msgs(self):
 		return self.__messages
+	def update_constants(self, bot_constants):
+		for key in bot_constants:
+			self.const()[key] = bot_constants[key]
+	def update_messages(self, bot_msgs):
+		for key in bot_msgs:
+			self.msgs()[key] = bot_msgs[key]
 		
 	async def ban(self, character, time):
 		ban = "CTU {{\"channel\":\"{0}\",\"character\":\"{1}\",\"length\":\"{2}\"}}".format(self.const()["channel"], character, time)
@@ -121,7 +127,11 @@ class Chatbot:
 		raise NotImplementedError
 	
 	def initialize_bot(self):
-		raise NotImplementedError
+		json_cfg = open("chatbot.json", encoding='utf-8')
+		bot_cfg = json.loads(json_cfg.read())
+		json_cfg.close()
+		self.update_constants(bot_cfg["constants"])
+		self.update_messages(bot_cfg["messages"])
 		
 	async def __run_bot(self, ticket):
 		async with websockets.connect('wss://{0}:{1}'.format(self.const()["host"], self.const()["port"])) as websocket:
