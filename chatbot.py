@@ -55,8 +55,7 @@ class Chatbot:
 		print('\nError: ',text)
 		try:
 			if 'ticket' in text:
-				global TICKET
-				TICKET = None
+				self.clear_ticket()
 		except TypeError:
 			return
 		
