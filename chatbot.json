@@ -5,6 +5,9 @@
         "channel": "",
         "owner": "",
         "channel_name": "",
+		"dispatchers": {
+			"PIN": "handle_ping",
+        },
         "valid_codes": [
             "ERR",
             "JCH",
