@@ -20,37 +20,39 @@ class Chatbot:
 		self.__constants = defaultdict(str)
 		self.__messages = defaultdict(str)
 		self.__current_room_users = set()
+		self.__dispatch = {}
 			
 	def const(self):
 		return self.__constants
 	def msgs(self):
 		return self.__messages
+	def dispatch_map(self):
+		return self.__dispatch
 	def update_constants(self, bot_constants):
 		for key in bot_constants:
 			self.const()[key] = bot_constants[key]
 	def update_messages(self, bot_msgs):
 		for key in bot_msgs:
 			self.msgs()[key] = bot_msgs[key]
+	def add_dispatch(self, key, val):
+		self.__dispatch[key] = val
+	def remove_dispatch(self, key):
+		self.__dispatch.pop(key, None)
 		
+	async def send_websocket(self, code, info_dict, delay = 0):
+		message = "{} {}".format(code, json.dumps(info_dict))
+		await self.timestamp_logs(message)
+		await self.get_websocket().send(message)
+		if delay > 0:
+			await asyncio.sleep(delay)
 	async def ban(self, character, time):
-		ban = "CTU {{\"channel\":\"{0}\",\"character\":\"{1}\",\"length\":\"{2}\"}}".format(self.const()["channel"], character, time)
-		await self.get_websocket().send(ban)
-		
-	async def kick(self, character, time):
-		ban = "CKU {{\"channel\":\"{0}\",\"character\":\"{1}\"}}".format(self.const()["channel"], character)
-		await self.get_websocket().send(ban)
-
+		await self.send_websocket("CTU", {"channel": self.const()["channel"], "character": character, "length" : time})
+	async def kick(self, character):
+		await self.send_websocket("CKU", {"channel": self.const()["channel"], "character": character})
 	async def message(self, character, msg):
-		message = "PRI {{\"recipient\":\"{0}\",\"message\":\"{1}\"}}".format(character, msg, self.bot_name)
-		await self.timestamp_logs(message)
-		await self.get_websocket().send(message)
-		await asyncio.sleep(1)
-		
+		await self.send_websocket("PRI", {"recipient": character, "message": msg}, 1)
 	async def announce(self, channel, msg):
-		message = "MSG {{\"channel\":\"{0}\",\"message\":\"{1}\"}}".format(channel, msg, self.bot_name)
-		await self.timestamp_logs(message)
-		await self.get_websocket().send(message)
-		await asyncio.sleep(1)
+		await self.send_websocket("MSG", {"channel": channel, "message": msg}, 1)
 		
 	def print_error(self, text):
 		print('\nError: ',text)
@@ -81,7 +83,7 @@ class Chatbot:
 		if ticket_json['error'] == '':
 			return ticket_json['ticket']
 		else:
-			print_error(ticket_json['error'])
+			self.print_error(ticket_json['error'])
 			return 0
 	def ticket(self, bookmarks = None):
 		if self.__ticket == None:
@@ -121,10 +123,10 @@ class Chatbot:
 	def set_websocket(self, socket):
 		self.__websocket = socket
 		
-	async def process_socket(self, receive, info, channel):
-		raise NotImplementedError
+	async def handle_ping(self, receive, info, character):
+		await self.get_websocket().send('PIN')
 	async def after_process_socket(self):
-		raise NotImplementedError
+		pass
 	
 	def initialize_bot(self):
 		json_cfg = open("chatbot.json", encoding='utf-8')
@@ -132,33 +134,33 @@ class Chatbot:
 		json_cfg.close()
 		self.update_constants(bot_cfg["constants"])
 		self.update_messages(bot_cfg["messages"])
+		for key, dispatch_name in self.const()["dispatchers"].items():
+			self.add_dispatch(key, getattr(self,dispatch_name))
 		return bot_cfg
 		
 	async def __run_bot(self, ticket):
 		async with websockets.connect('wss://{0}:{1}'.format(self.const()["host"], self.const()["port"])) as websocket:
 			self.set_websocket(websocket)
-			identify = "IDN {{\"method\":\"ticket\",\"account\":\"{0}\",\"ticket\":\"{1}\",\"character\":\"{4}\",\"cname\":\"{2}\",\"cversion\":\"{3}\"}}".format(self.__account_name, ticket, self.service_name, self.service_version, self.bot_name)
-			await websocket.send(identify)
+			await self.send_websocket("IDN", {"method": "ticket", "account": self.__account_name, "ticket" : ticket, "character": self.bot_name, "cname": self.service_name, "cversion": str(self.service_version)})
 			while True:
 				receive = await websocket.recv()
 				await self.timestamp_logs(receive)
 				break
-			status = "STA {{\"status\":\"online\", \"statusmsg\":\"{0}\"}}".format(self.__messages["status"].format(self.__constants["channel_name"],self.const()["channel"]))
-			await websocket.send(status)
-			join = "JCH {{\"channel\":\"{0}\"}}".format(self.const()["channel"])
-			await websocket.send(join)
+			await self.send_websocket("STA", {"status": "online", "statusmsg": self.__messages["status"].format(self.__constants["channel_name"],self.const()["channel"])})
+			await self.send_websocket("JCH", {"channel" : self.const()["channel"]})
 			while True:
 				receive = await websocket.recv()
-				info = None
-				channel = None
-				if receive[:3] in self.const()["valid_codes"]:
-					info = json.loads(receive[4:])
-					channel = json.loads(receive[4:])
-					if (not 'channel' in channel) or (channel['channel'] == self.const()["channel"]):
+				code = receive[:3].strip()
+				info = json.loads(receive[4:]) if len(receive) > 3 else {}
+				channel = info["channel"].lower() if "channel" in info else None
+				user = info["character"] if "character" in info else None
+				if code in self.const()["valid_codes"]:
+					if (not 'channel' in info) or (channel == self.const()["channel"]):
 						if not receive.startswith("FLN") or info['character'] in self.current_users():
 							await self.timestamp_logs(receive)
 				try:
-					await self.process_socket(receive, info, channel)
+					if code in self.dispatch_map().keys():
+						await self.dispatch_map()[code](info, channel, user)
 				except Exception as e:
 					self.print_error(traceback.format_exc())
 				await self.after_process_socket()
